@@ -1,12 +1,12 @@
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { Button } from "@/components/ui/button";
+import { Button } from "@/components/ui/button.tsx";
 import { BellRing, Receipt, MessagesSquare, ShieldCheck, Languages, Mic } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client.ts";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "CivicLink — Smart utilities for citizens" },
+      { title: "CivicConnect — Smart utilities for citizens" },
       { name: "description", content: "Track outages, pay bills, get AI answers, and file complaints — all in one civic platform." },
     ],
   }),
@@ -24,7 +24,7 @@ function Landing() {
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
         <div className="flex items-center gap-2 font-semibold">
           <div className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">CL</div>
-          CivicLink
+          CivicConnect
         </div>
         <div className="flex items-center gap-2">
           <Link to="/auth"><Button variant="ghost">Sign in</Button></Link>
@@ -40,7 +40,7 @@ function Landing() {
             Your community utilities, <span className="text-primary">simplified</span>.
           </h1>
           <p className="mt-5 max-w-lg text-lg text-muted-foreground">
-            CivicLink brings outage alerts, bill payments, an AI assistant, and citizen feedback into one transparent platform — in your language, with your voice.
+            CivicConnect brings outage alerts, bill payments, an AI assistant, and citizen feedback into one transparent platform — in your language, with your voice.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link to="/auth"><Button size="lg">Create free account</Button></Link>

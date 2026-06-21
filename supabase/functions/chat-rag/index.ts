@@ -1,27 +1,39 @@
 // Chat assistant with RAG over kb_chunks + admin "summarize" mode.
-// CORS-safe, uses Lovable AI Gateway.
+import { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } from "../config.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY")!;
+const SERVICE_ROLE = SUPABASE_SERVICE_ROLE_KEY;
 
-const LANG_NAMES: Record<string, string> = { en: "English", hi: "Hindi", es: "Spanish" };
+const LANG_NAMES: Record<string, string> = {
+  en: "English",
+  hi: "Hindi",
+  es: "Spanish",
+};
 
 async function embed(text: string): Promise<number[] | null> {
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/embeddings", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "openai/text-embedding-3-small", input: text }),
-    });
-    if (!res.ok) return null;
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/embedding-001:embedText",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${GEMINI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model: "embedding-001", text }),
+      }
+    );
     const j = await res.json();
-    return j.data?.[0]?.embedding ?? null;
-  } catch { return null; }
+    return j.embedding?.value ?? null;
+  } catch {
+    return null;
+  }
 }
 
 async function retrieve(query: string): Promise<string> {
@@ -29,42 +41,72 @@ async function retrieve(query: string): Promise<string> {
   if (!vec) return "";
   const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/match_kb_chunks`, {
     method: "POST",
-    headers: { apikey: SERVICE_ROLE, Authorization: `Bearer ${SERVICE_ROLE}`, "Content-Type": "application/json" },
+    headers: {
+      apikey: SERVICE_ROLE,
+      Authorization: `Bearer ${SERVICE_ROLE}`,
+      "Content-Type": "application/json",
+    },
     body: JSON.stringify({ query_embedding: vec, match_count: 5 }),
   });
   if (!r.ok) return "";
   const rows = await r.json();
   if (!Array.isArray(rows) || rows.length === 0) return "";
-  return rows.map((row: { title?: string; content: string }, i: number) => `[${i + 1}] ${row.title ?? ""}\n${row.content}`).join("\n\n");
+  return rows
+    .map(
+      (row: { title?: string; content: string }, i: number) =>
+        `[${i + 1}] ${row.title ?? ""}\n${row.content}`
+    )
+    .join("\n\n");
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS")
+    return new Response(null, { headers: corsHeaders });
+
   try {
     const body = await req.json();
 
-    // Admin summarize mode
+    // 🔑 Admin summarize mode
     if (body.mode === "summarize") {
-      const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: "Summarize the utility notice in 1-2 short sentences for citizens. Keep it factual and clear." },
-            { role: "user", content: body.text ?? "" },
-          ],
-        }),
-      });
+      const r = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${GEMINI_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  {
+                    text:
+                      "Summarize the utility notice in 1-2 short sentences for citizens. Keep it factual and clear.\n\n" +
+                      (body.text ?? ""),
+                  },
+                ],
+              },
+            ],
+          }),
+        }
+      );
       const j = await r.json();
-      const reply = j.choices?.[0]?.message?.content ?? "";
-      return new Response(JSON.stringify({ reply }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const reply = j.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+      return new Response(JSON.stringify({ reply }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    // Chat with RAG
-    const messages = body.messages as { role: "user" | "assistant"; content: string }[];
+    // 🔑 Chat with RAG
+    const messages = body.messages as {
+      role: "user" | "assistant";
+      content: string;
+    }[];
     const language = LANG_NAMES[body.language as string] ?? "English";
-    const lastUser = [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
+    const lastUser =
+      [...messages].reverse().find((m) => m.role === "user")?.content ?? "";
 
     const context = lastUser ? await retrieve(lastUser) : "";
 
@@ -77,25 +119,46 @@ If asked about specific bill or account data not in context, ask the user to che
 CONTEXT:
 ${context || "(no retrieved context)"}`;
 
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [{ role: "system", content: sysPrompt }, ...messages],
-      }),
-    });
+    const r = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${GEMINI_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            { role: "system", parts: [{ text: sysPrompt }] },
+            ...messages.map((m) => ({
+              role: m.role,
+              parts: [{ text: m.content }],
+            })),
+          ],
+        }),
+      }
+    );
 
-    if (r.status === 429) return new Response(JSON.stringify({ error: "Rate limit reached. Try again shortly." }), { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    if (r.status === 402) return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits in workspace billing." }), { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     if (!r.ok) {
       const text = await r.text();
-      return new Response(JSON.stringify({ error: "AI gateway error", detail: text }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(
+        JSON.stringify({ error: "Gemini API error", detail: text }),
+        {
+          status: r.status,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
     }
+
     const j = await r.json();
-    const reply = j.choices?.[0]?.message?.content ?? "";
-    return new Response(JSON.stringify({ reply }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const reply = j.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    return new Response(JSON.stringify({ reply }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (e) {
-    return new Response(JSON.stringify({ error: (e as Error).message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ error: (e as Error).message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

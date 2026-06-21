@@ -1,21 +1,35 @@
 import { createFileRoute, useNavigate, redirect } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button.tsx";
+import { Input } from "@/components/ui/input.tsx";
+import { Label } from "@/components/ui/label.tsx";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs.tsx";
 import { toast } from "sonner";
-import { useI18n } from "@/lib/i18n";
+import { useI18n } from "@/lib/i18n.tsx";
+import { auth } from "../firebaseConfig.ts"; 
+
+import {
+  GoogleAuthProvider,
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+
 
 export const Route = createFileRoute("/auth")({
-  head: () => ({ meta: [{ title: "Sign in — CivicLink" }] }),
+  head: () => ({
+    meta: [{ title: "Sign in — CivicConnect" }],
+  }),
+
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) throw redirect({ to: "/dashboard" });
+
+    if (auth.currentUser) {
+      throw redirect({ to: "/dashboard" });
+    }
   },
+
   component: AuthPage,
 });
 
@@ -27,32 +41,56 @@ function AuthPage() {
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const onSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
-    if (error) return toast.error(error.message);
+ const onSignIn = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
     navigate({ to: "/dashboard" });
-  };
-
-  const onSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email, password,
-      options: { emailRedirectTo: window.location.origin + "/dashboard", data: { full_name: fullName } },
-    });
+  } catch (error: any) {
+    toast.error(error.message);
+  } finally {
     setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Account created. You can sign in now.");
-  };
+  }
+};
 
-  const onGoogle = async () => {
-    const res = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin + "/dashboard" });
-    if (res.error) toast.error(res.error.message);
-    if (!res.redirected && !res.error) navigate({ to: "/dashboard" });
-  };
+ const onSignUp = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+
+  try {
+    const userCredential = await createUserWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
+    if (fullName) {
+      await updateProfile(userCredential.user, {
+        displayName: fullName,
+      });
+    }
+
+    toast.success("Account created successfully");
+    navigate({ to: "/dashboard" });
+  } catch (error: any) {
+    toast.error(error.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
+const onGoogle = async () => {
+  try {
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    console.log("User signed in:", result.user);
+    navigate({ to: "/dashboard" });
+  } catch (error: any) {
+    toast.error(error.message);
+  }
+};
 
   return (
     <div className="grid min-h-screen md:grid-cols-2">

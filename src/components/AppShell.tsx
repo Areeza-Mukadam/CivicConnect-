@@ -1,12 +1,15 @@
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { LayoutDashboard, BellRing, Receipt, MessageSquare, MessagesSquare, ShieldCheck, LogOut, User, Languages, Menu } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { useI18n, LANG_LABELS, type Lang } from "@/lib/i18n";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button.tsx";
+import { useI18n, LANG_LABELS, type Lang } from "@/lib/i18n.tsx";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "@/components/ui/dropdown-menu.tsx";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet.tsx";
+import { cn } from "@/lib/utils.ts";
+
+// 🔑 Firebase imports
+import { auth } from "../firebaseConfig.ts";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { t, lang, setLang } = useI18n();
@@ -18,14 +21,20 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user || !active) return;
       setEmail(user.email ?? null);
-      const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id);
-      if (active) setIsAdmin(!!data?.some((r) => r.role === "admin"));
-    })();
-    return () => { active = false; };
+
+      // 🔑 Role check: replace this with Firestore query if you store roles
+      // Example: fetch from Firestore users/{uid}/role
+      // For now, default to non-admin
+      setIsAdmin(false);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
   }, []);
 
   const navItems = [
@@ -38,7 +47,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   ];
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await signOut(auth);
     navigate({ to: "/auth", replace: true });
   };
 

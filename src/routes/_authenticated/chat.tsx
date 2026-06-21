@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { useI18n } from "@/lib/i18n";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/integrations/supabase/client.ts";
+import { useI18n } from "@/lib/i18n.tsx";
+import { Card } from "@/components/ui/card.tsx";
+import { Button } from "@/components/ui/button.tsx";
+import { Textarea } from "@/components/ui/textarea.tsx";
 import { Mic, MicOff, Send, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
