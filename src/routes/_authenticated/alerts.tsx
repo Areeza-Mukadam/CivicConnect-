@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useI18n } from "@/lib/i18n";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertIcon, SeverityBadge } from "./dashboard";
+import { supabase } from "@/integrations/supabase/client.ts";
+import { useI18n } from "@/lib/i18n.tsx";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card.tsx";
+import { AlertIcon, SeverityBadge } from "./dashboard.tsx";
 import { format } from "date-fns";
 
 export const Route = createFileRoute("/_authenticated/alerts")({

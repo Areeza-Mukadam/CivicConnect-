@@ -3,7 +3,7 @@ import { createMiddleware } from '@tanstack/react-start'
 import { getRequest } from '@tanstack/react-start/server'
 import { createClient } from '@supabase/supabase-js'
 import type { Database } from './types.ts'
-
+import { getClaims } from "@/lib/authAdapter.ts";
 
 
 export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server(
@@ -60,7 +60,7 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
       }
     );
 
-    const { data, error } = await supabase.auth.getClaims(token);
+    const { data, error } = await getClaims();
     if (error || !data?.claims) {
       throw new Error('Unauthorized: Invalid token');
     }

@@ -2,6 +2,7 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button.tsx";
 import { BellRing, Receipt, MessagesSquare, ShieldCheck, Languages, Mic } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client.ts";
+import { getUser, getSession, getClaims } from "@/lib/authAdapter.ts";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -12,7 +13,7 @@ export const Route = createFileRoute("/")({
   }),
   beforeLoad: async () => {
     if (typeof window === "undefined") return;
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await getSession();
     if (session) throw redirect({ to: "/dashboard" });
   },
   component: Landing,

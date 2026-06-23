@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label.tsx";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select.tsx";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-
+import { getUser } from "@/lib/authAdapter.ts";
 export const Route = createFileRoute("/_authenticated/profile")({
   head: () => ({ meta: [{ title: "Profile — CivicLink" }] }),
   component: Profile,
@@ -23,7 +23,7 @@ function Profile() {
   const { data } = useQuery({
     queryKey: ["profile-edit"],
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getUser();
       if (!user) return null;
       const { data } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
       return data;
@@ -40,7 +40,7 @@ function Profile() {
 
   const save = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getUser();
       if (!user) throw new Error("Not authenticated");
       const { error } = await supabase.from("profiles").update(form).eq("id", user.id);
       if (error) throw error;

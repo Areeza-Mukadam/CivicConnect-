@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge.tsx";
 import { toast } from "sonner";
 import { useState } from "react";
 import { format } from "date-fns";
+import { getUser } from "@/lib/authAdapter.ts";
 
 export const Route = createFileRoute("/_authenticated/feedback")({
   head: () => ({ meta: [{ title: "Feedback — CivicLink" }] }),
@@ -33,7 +34,7 @@ function Feedback() {
 
   const submit = useMutation({
     mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await getUser();
       if (!user) throw new Error("Not authenticated");
       const { error } = await supabase.from("complaints").insert({ user_id: user.id, category, subject, message, ward: ward || null });
       if (error) throw error;

@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs.t
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n.tsx";
 import { auth } from "../firebaseConfig.ts"; 
+import { supabase } from "@/integrations/supabase/client.ts";
 
 import {
   GoogleAuthProvider,
@@ -33,6 +34,15 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+const ensureProfile = async (user: any) => {
+  await (supabase as any)
+    .from("profiles")
+    .upsert({
+      id: user.uid,
+      full_name: user.displayName ?? null,
+    });
+};
+
 function AuthPage() {
   const navigate = useNavigate();
   const { t } = useI18n();
@@ -46,8 +56,15 @@ function AuthPage() {
   setLoading(true);
 
   try {
-    await signInWithEmailAndPassword(auth, email, password);
-    navigate({ to: "/dashboard" });
+    const userCredential = await signInWithEmailAndPassword(
+  auth,
+  email,
+  password
+);
+
+await ensureProfile(userCredential.user);
+
+navigate({ to: "/dashboard" });
   } catch (error: any) {
     toast.error(error.message);
   } finally {
@@ -72,8 +89,10 @@ function AuthPage() {
       });
     }
 
-    toast.success("Account created successfully");
-    navigate({ to: "/dashboard" });
+   await ensureProfile(userCredential.user);
+
+toast.success("Account created successfully");
+navigate({ to: "/dashboard" });
   } catch (error: any) {
     toast.error(error.message);
   } finally {
@@ -85,8 +104,10 @@ const onGoogle = async () => {
   try {
     const provider = new GoogleAuthProvider();
     const result = await signInWithPopup(auth, provider);
-    console.log("User signed in:", result.user);
-    navigate({ to: "/dashboard" });
+    await ensureProfile(result.user);
+
+console.log("User signed in:", result.user);
+navigate({ to: "/dashboard" });
   } catch (error: any) {
     toast.error(error.message);
   }
